@@ -22,7 +22,10 @@ contactRouter.post('/', async (request, response, next) => {
 
   const contact = new Contact({
     name: body.name,
-    number: body.number
+    number: body.number,
+    email: body.email, // Agregar email
+    subject: body.subject, // Agregar subject
+    message: body.message
   })
 
   try {
