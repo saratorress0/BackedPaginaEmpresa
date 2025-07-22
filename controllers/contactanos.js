@@ -22,9 +22,8 @@ contactRouter.post('/', async (request, response, next) => {
 
   const contact = new Contact({
     name: body.name,
-    number: body.number,
-    email: body.email, // Agregar email
-    subject: body.subject, // Agregar subject
+    email: body.email,
+    subject: body.subject,
     message: body.message
   })
 
@@ -35,6 +34,7 @@ contactRouter.post('/', async (request, response, next) => {
     next(error)
   }
 })
+
 
 contactRouter.delete('/:id', async (request, response, next) => {
   try {

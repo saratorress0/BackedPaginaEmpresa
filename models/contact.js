@@ -6,12 +6,7 @@ const contactSchema = new mongoose.Schema({
     required: true,
     minlength: 3,
     unique: true
-  },
-  number: {
-    type: String,
-    required: true,
-    minlength: 10,
-    unique: true
+
   },
   email: { 
     type: String, 
@@ -35,4 +30,4 @@ contactSchema.set('toJSON', {
   }
 })
 
-module.exports = mongoose.model('Contact', contactSchema)
+module.exports = mongoose.model('Contactanos', contactSchema)
