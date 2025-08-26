@@ -1,23 +1,13 @@
 const mongoose = require('mongoose')
 
 const contactSchema = new mongoose.Schema({
-  name: {
+  username: {
     type: String,
     required: true,
-    minlength: 3,
     unique: true
-
   },
-  email: { 
-    type: String, 
-    required: true 
-  }, // Nuevo campo
-  subject: { 
-    type: String, 
-    required: true 
-  }, // Nuevo campo
-  message: { 
-    type: String, 
+  password: {
+    type: String,
     required: true
   }
 })
@@ -30,4 +20,4 @@ contactSchema.set('toJSON', {
   }
 })
 
-module.exports = mongoose.model('Contactanos', contactSchema)
+module.exports = mongoose.model('Usuarios', contactSchema)
