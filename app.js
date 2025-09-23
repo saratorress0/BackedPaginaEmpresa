@@ -27,8 +27,8 @@ app.get("/api/estudiantes", async (req, res) => {
   }
 });
 
-app.get("/api/notas/:materia/:grado", async (req, res) => {
-  const { materia, grado } = req.params;
+app.get("/api/notas/:materiaId/:gradoId", async (req, res) => {
+  const { materiaId, gradoId } = req.params;
   try {
     const q = `
       SELECT e.nombre AS estudiante, n.columna, n.nota
@@ -36,10 +36,10 @@ app.get("/api/notas/:materia/:grado", async (req, res) => {
       JOIN estudiantes e ON e.id = n.estudiante_id
       JOIN materias m ON m.id = n.materia_id
       JOIN grados g ON g.id = n.grado_id
-      WHERE m.nombre = $1 AND g.nombre = $2
+      WHERE m.id = $1 AND g.id = $2
       ORDER BY e.nombre;
     `;
-    const result = await pool.query(q, [materia, grado]);
+    const result = await pool.query(q, [materiaId, gradoId]);
     res.json(result.rows);
   } catch (err) {
     console.error("Error obteniendo notas:", err);
@@ -47,34 +47,73 @@ app.get("/api/notas/:materia/:grado", async (req, res) => {
   }
 });
 
+// Buscar materia por nombre
+// Buscar materia por nombre (ignorando mayúsculas y acentos)
+app.get("/api/materias/name/:nombre", async (req, res) => {
+  try {
+    const nombre = req.params.nombre;
+
+    const q = `
+      SELECT * FROM materias
+      WHERE unaccent(lower(nombre)) = unaccent(lower($1))
+      LIMIT 1
+    `;
+    const result = await pool.query(q, [nombre]);
+
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).json({ error: "Materia no encontrada" });
+    }
+  } catch (err) {
+    console.error("Error buscando materia por nombre:", err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+
+// GET /api/grados/name/:nombre -> { id, nombre }
+app.get("/api/grados/name/:nombre", async (req, res) => {
+  const { nombre } = req.params;
+  try {
+    const q = `SELECT id, nombre FROM grados WHERE nombre ILIKE $1 LIMIT 1`;
+    const result = await pool.query(q, [nombre]);
+    if (result.rowCount === 0) return res.status(404).json({ error: "Grado no encontrado" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error buscando grado:", err);
+    res.status(500).json({ error: "Error buscando grado" });
+  }
+});
+
+
+
+// POST /api/notas  -> espera { materiaId, gradoId, estudiantes }
 app.post("/api/notas", async (req, res) => {
-  const { materia, grado, estudiantes } = req.body;
-  if (!materia || !grado || !Array.isArray(estudiantes)) {
-    return res.status(400).json({ error: "Faltan campos: materia, grado o estudiantes" });
+  const { materiaId, gradoId, estudiantes } = req.body;
+  if (!materiaId || !gradoId || !Array.isArray(estudiantes)) {
+    return res.status(400).json({ error: "Faltan campos: materiaId, gradoId o estudiantes" });
   }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    const materia_id = await getIdOrCreate(client, "materias", materia);
-    const grado_id = await getIdOrCreate(client, "grados", grado);
-
     for (const fila of estudiantes) {
       const estudianteNombre = fila.estudiante;
       const notasObj = fila.notas || {};
 
+      // los estudiantes sí los seguimos creando/buscando por nombre
       const estudiante_id = await getIdOrCreate(client, "estudiantes", estudianteNombre);
 
       for (const [columna, valor] of Object.entries(notasObj)) {
-
         const notaVal = valor === "" ? null : valor;
         await client.query(
           `INSERT INTO notas (estudiante_id, materia_id, grado_id, columna, nota)
            VALUES ($1,$2,$3,$4,$5)
            ON CONFLICT (estudiante_id, materia_id, grado_id, columna)
            DO UPDATE SET nota = EXCLUDED.nota, updated_at = now()`,
-          [estudiante_id, materia_id, grado_id, columna, notaVal]
+          [estudiante_id, materiaId, gradoId, columna, notaVal]
         );
       }
     }
@@ -89,5 +128,6 @@ app.post("/api/notas", async (req, res) => {
     client.release();
   }
 });
+
 
 module.exports = app;
