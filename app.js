@@ -31,25 +31,26 @@ app.get("/api/notas/:materiaId/:gradoId", async (req, res) => {
   const { materiaId, gradoId } = req.params;
   try {
     const q = `
-      SELECT e.nombre AS estudiante, n.columna, n.nota
+      SELECT e.nombre  AS estudiante,
+             n.examen1, n.examen2, n.examen_final,
+             n.h1, n.h2, n.h3, n.h4
       FROM notas n
       JOIN estudiantes e ON e.id = n.estudiante_id
-      JOIN materias m ON m.id = n.materia_id
-      JOIN grados g ON g.id = n.grado_id
-      WHERE m.id = $1 AND g.id = $2
+      WHERE n.materia_id = $1
+        AND n.grado_id   = $2
       ORDER BY e.nombre;
     `;
-    const result = await pool.query(q, [materiaId, gradoId]);
-    res.json(result.rows);
+    const { rows } = await pool.query(q, [materiaId, gradoId]);
+    res.json(rows);
   } catch (err) {
     console.error("Error obteniendo notas:", err);
     res.status(500).json({ error: "Error obteniendo notas" });
   }
 });
 
-// Buscar materia por nombre
-// Buscar materia por nombre (ignorando mayúsculas y acentos)
+
 app.get("/api/materias/name/:nombre", async (req, res) => {
+  console.log("🔍 Parámetro recibido en ruta:", req.params.nombre);
   try {
     const nombre = req.params.nombre;
 
@@ -71,8 +72,6 @@ app.get("/api/materias/name/:nombre", async (req, res) => {
   }
 });
 
-
-// GET /api/grados/name/:nombre -> { id, nombre }
 app.get("/api/grados/name/:nombre", async (req, res) => {
   const { nombre } = req.params;
   try {
@@ -86,38 +85,51 @@ app.get("/api/grados/name/:nombre", async (req, res) => {
   }
 });
 
-
-
-// POST /api/notas  -> espera { materiaId, gradoId, estudiantes }
 app.post("/api/notas", async (req, res) => {
   const { materiaId, gradoId, estudiantes } = req.body;
   if (!materiaId || !gradoId || !Array.isArray(estudiantes)) {
-    return res.status(400).json({ error: "Faltan campos: materiaId, gradoId o estudiantes" });
+    return res.status(400).json({ error: "Faltan materiaId, gradoId o estudiantes" });
   }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     for (const fila of estudiantes) {
-      const estudianteNombre = fila.estudiante;
-      const notasObj = fila.notas || {};
-
-      // los estudiantes sí los seguimos creando/buscando por nombre
-      const estudiante_id = await getIdOrCreate(client, "estudiantes", estudianteNombre);
-
-      for (const [columna, valor] of Object.entries(notasObj)) {
-        const notaVal = valor === "" ? null : valor;
-        await client.query(
-          `INSERT INTO notas (estudiante_id, materia_id, grado_id, columna, nota)
-           VALUES ($1,$2,$3,$4,$5)
-           ON CONFLICT (estudiante_id, materia_id, grado_id, columna)
-           DO UPDATE SET nota = EXCLUDED.nota, updated_at = now()`,
-          [estudiante_id, materiaId, gradoId, columna, notaVal]
-        );
-      }
+      // 1) Obtener o crear estudiante_id
+      const estudiante_id = await getIdOrCreate(client, "estudiantes", fila.estudiante);
+      // 2) Desestructurar notas
+      const { examen1, examen2, examen_final, h1, h2, h3, h4 } = fila.notas;
+      // 3) INSERT … ON CONFLICT
+      await client.query(
+        `INSERT INTO notas
+           (estudiante_id, materia_id, grado_id,
+            examen1, examen2, examen_final,
+            h1, h2, h3, h4)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (estudiante_id, materia_id, grado_id)
+         DO UPDATE SET
+           examen1      = EXCLUDED.examen1,
+           examen2      = EXCLUDED.examen2,
+           examen_final = EXCLUDED.examen_final,
+           h1           = EXCLUDED.h1,
+           h2           = EXCLUDED.h2,
+           h3           = EXCLUDED.h3,
+           h4           = EXCLUDED.h4,
+           updated_at   = NOW()`,
+        [
+          estudiante_id,
+          materiaId,
+          gradoId,
+          examen1,
+          examen2,
+          examen_final,
+          h1,
+          h2,
+          h3,
+          h4
+        ]
+      );
     }
-
     await client.query("COMMIT");
     res.json({ message: "Notas guardadas" });
   } catch (err) {
@@ -128,6 +140,9 @@ app.post("/api/notas", async (req, res) => {
     client.release();
   }
 });
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend corriendo en http://localhost:${PORT}`));
 
 
 module.exports = app;

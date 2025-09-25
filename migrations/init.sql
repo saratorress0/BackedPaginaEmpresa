@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS notas (
   updated_at TIMESTAMP DEFAULT now()
 );
 
--- datos ejemplo
+
 INSERT INTO materias (nombre) VALUES ('matemáticas') ON CONFLICT DO NOTHING;
 INSERT INTO grados (nombre) VALUES ('9-1') ON CONFLICT DO NOTHING;
 
@@ -40,10 +40,15 @@ INSERT INTO estudiantes (nombre) VALUES ('Juan Pérez') ON CONFLICT DO NOTHING;
 INSERT INTO estudiantes (nombre) VALUES ('María Gómez') ON CONFLICT DO NOTHING;
 INSERT INTO estudiantes (nombre) VALUES ('Carlos Ruiz') ON CONFLICT DO NOTHING;
 
--- insertar notas ejemplo (buscar ids dinámicamente)
+
 WITH m AS (SELECT id AS mid FROM materias WHERE nombre='matemáticas'),
      g AS (SELECT id AS gid FROM grados WHERE nombre='9-1')
 INSERT INTO notas (estudiante_id, materia_id, grado_id, examen1, examen2, examen_final)
 SELECT e.id, m.mid, g.gid, NULL, NULL, NULL
 FROM estudiantes e, m, g
 ON CONFLICT DO NOTHING;
+
+ALTER TABLE notas
+ADD CONSTRAINT uq_notas_composite
+UNIQUE(estudiante_id, materia_id, grado_id);
+

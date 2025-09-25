@@ -9,3 +9,5 @@ module.exports = {
   query: (text, params) => pool.query(text, params),
   pool
 };
+
+console.log("▶️ Conectando a BD con:", process.env.DATABASE_URL);
